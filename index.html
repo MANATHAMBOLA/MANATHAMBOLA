@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THAMBOLA HOST</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #eceff1; text-align: center; }
+  .header { background: #b71c1c; color: white; padding: 15px; font-size: 24px; font-weight: bold; border-bottom: 3px solid #ffeb3b; }
+  .game-number { font-size: 16px; color: #ffeb3b; margin-top: 5px; }
+  .container { padding: 20px; }
+  .btn { padding: 10px 20px; font-size: 16px; color: white; background: #4caf50; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; transition: 0.3s; }
+  .btn:hover { opacity: 0.9; }
+  .btn.red { background: #f44336; } .btn.blue { background: #2196f3; } .btn.dark { background: #333; }
+  .input-box { padding: 10px; font-size: 16px; width: 150px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
+  .panel { background: white; padding: 15px; margin: 15px auto; max-width: 600px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+  .big-number { font-size: 70px; color: #d32f2f; font-weight: bold; margin: 5px; }
+  .link-box { background: #e3f2fd; padding: 15px; border: 1px dashed #2196f3; word-break: break-all; margin-top: 10px; font-size: 14px; }
+  .recent-box { background: #fff3e0; border: 2px solid #ff9800; padding: 10px; margin: 10px auto 20px; max-width: 400px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .recent-label { font-size: 16px; font-weight: bold; color: #e65100; }
+  .recent-circle { width: 40px; height: 40px; border-radius: 50%; background: #ffb74d; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; border: 2px solid #f57c00; }
+  .recent-circle.latest { background: #f44336; border-color: #d32f2f; }
+  .ticket-wrap { border: 3px solid #6a1b9a; margin: 15px auto; background: white; max-width: 500px; }
+  .t-head { background: #f3e5f5; color: #4a148c; padding: 8px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+  .cancel-btn { background: #f44336; color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 12px; border-radius: 3px; font-weight: bold;}
+  .add-btn { background: #2196f3; color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 12px; border-radius: 3px; font-weight: bold; margin-right: 5px;}
+  .t-grid { display: grid; grid-template-columns: repeat(9, 1fr); border-top: 2px solid #6a1b9a; }
+  .t-cell { border: 1px solid #ccc; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; user-select: none; }
+  .t-cell.empty { background: #fafafa; border-color: transparent; }
+  .t-cell.num { cursor: default; }
+  .t-cell.marked { background: #e53935 !important; color: white; }
+  .board { display: grid; grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(10, 1fr); grid-auto-flow: column; gap: 2px; max-width: 500px; margin: 15px auto; }
+  .b-cell { background: white; border: 1px solid #999; padding: 8px 5px; font-size: 14px; font-weight: bold; transition: 0.2s; cursor: pointer; }
+  .b-cell.called { background: #ffeb3b; } .b-cell.current { background: #f44336; color: white; }
+  .b-cell:hover:not(.called):not(.current) { background: #e0f7fa; }
+  #host-login-view, #host-view, #setup-view { display: none; }
+  .game-time-display { font-size: 18px; color: #1a237e; background: #e8eaf6; padding: 10px; border-radius: 5px; border: 1px solid #3f51b5; margin-bottom: 15px; font-weight: bold; display: none; }
+</style>
+</head>
+<body>
+<div class="header">
+  THAMBOLA HOST PANEL
+  <div id="display-game-id" class="game-number"></div>
+</div>
+
+<div id="host-login-view" class="container">
+  <div class="panel">
+    <h2 style="color: #d32f2f;">Host Security Login</h2>
+    <p>Please enter the secret PIN to access the Host Panel:</p>
+    <input type="password" id="host-pin" class="input-box" style="text-align:center; font-size: 20px; font-weight: bold;" placeholder="****">
+    <br><br>
+    <button class="btn blue" onclick="verifyHostPIN()">UNLOCK</button>
+  </div>
+</div>
+
+<div id="setup-view" class="container">
+  <div class="panel">
+    <h2>Welcome to Live Tambola</h2>
+    <p>Enter Game Number:</p>
+    <input type="text" id="custom-game-id" class="input-box" value="001" style="text-align:center; font-size: 20px; font-weight: bold; width: 250px;">
+    <br><br>
+    <p>Set Game Start Time (Optional):</p>
+    <input type="time" id="game-start-time" class="input-box" style="text-align:center; font-size: 18px;">
+    <br><br>
+    <button class="btn blue" onclick="initHostGame()">CREATE GAME (HOST)</button>
+  </div>
+</div>
+
+<div id="host-view" class="container">
+  <div class="panel">
+    <h2>Host Dashboard</h2>
+    <div id="host-time-display" class="game-time-display"></div>
+    <div id="host-current-num" class="big-number">--</div>
+    <div class="recent-box">
+      <div class="recent-label">Last 5:</div>
+      <div id="host-recent-nums" style="display:flex; gap:8px;"></div>
+    </div>
+    <button id="auto-play-btn" class="btn" onclick="toggleAutoPlay()">▶ AUTO PLAY</button>
+    <button class="btn blue" onclick="drawSingle()">DRAW RANDOM</button>
+    <button class="btn dark" onclick="endGame()">GAME OVER</button>
+  </div>
+
+  <div class="panel">
+    <h3>Manual Selection Board (Tap to Call)</h3>
+    <p style="font-size:12px; color:red;">Click any uncalled number below to announce it live.</p>
+    <div class="board" id="host-board"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Create Player Tickets</h3>
+    <input type="text" id="p-name" class="input-box" placeholder="Player Name">
+    <input type="number" id="p-count" class="input-box" placeholder="Tickets (e.g. 2)" style="width: 100px;">
+    <button class="btn" id="generate-link-btn" onclick="createPlayerLink()">Generate Link</button>
+    <div id="link-output"></div>
+  </div>
+
+  <div class="panel">
+    <h3>All Players Tickets (Auto-Tick)</h3>
+    <div id="host-tickets-area"></div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAvjFcKKiu4OMmQckYXMTejdBJh9tC6TjM",
+    authDomain: "sri-vishnu-priya-finance-c591f.firebaseapp.com",
+    databaseURL: "https://sri-vishnu-priya-finance-c591f-default-rtdb.firebaseio.com",
+    projectId: "sri-vishnu-priya-finance-c591f",
+    storageBucket: "sri-vishnu-priya-finance-c591f.firebasestorage.app",
+    messagingSenderId: "184676228358",
+    appId: "1:184676228358:web:c2b32b68debeeadadfd287"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let gameId, autoPlayTimer = null;
+  let allNumbers = [], calledNumbers = [];
+  const SECRET_HOST_PIN = "7777"; 
+
+  window.onload = () => {
+    let savedHostGame = localStorage.getItem('tambola_live_host_game');
+    if(savedHostGame) {
+      gameId = savedHostGame;
+      document.getElementById('display-game-id').innerText = "Game Number: " + gameId;
+      document.getElementById('host-view').style.display = 'block';
+      createBoardUI('host-board');
+      listenToGameState();
+    } else {
+      document.getElementById('host-login-view').style.display = 'block';
+    }
+  };
+
+  function verifyHostPIN() {
+    if(document.getElementById('host-pin').value === SECRET_HOST_PIN) {
+      document.getElementById('host-login-view').style.display = 'none';
+      document.getElementById('setup-view').style.display = 'block';
+      createBoardUI('host-board');
+    } else {
+      alert("Wrong PIN!");
+      document.getElementById('host-pin').value = '';
+    }
+  }
+
+  function formatAMPM(timeString) {
+    if (!timeString) return '';
+    const [hours, minutes] = timeString.split(':');
+    let h = parseInt(hours);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; h = h ? h : 12; 
+    return `${h}:${minutes} ${ampm}`;
+  }
+
+  function createBoardUI(containerId) {
+    let board = document.getElementById(containerId);
+    board.innerHTML = '';
+    for(let i=1; i<=90; i++) {
+      let c = document.createElement('div');
+      c.id = 'hb-' + i; 
+      c.className = 'b-cell'; 
+      c.innerText = i;
+      c.onclick = () => drawSpecificNumber(i);
+      board.appendChild(c);
+    }
+  }
+
+  function reconstructPool(calledArray) {
+    let pool = [];
+    for(let i=1; i<=90; i++) if(!calledArray.includes(i)) pool.push(i);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool;
+  }
+
+  function initHostGame() {
+    gameId = document.getElementById('custom-game-id').value.trim() || "001";
+    let startTime = document.getElementById('game-start-time').value;
+    document.getElementById('display-game-id').innerText = "Game Number: " + gameId;
+    allNumbers = reconstructPool([0]);
+    db.ref('games/' + gameId).set({ status: 'active', currentDraw: 0, called: [0], startTime: startTime || '', globalTicketCount: 0 });
+    localStorage.setItem('tambola_live_host_game', gameId);
+    document.getElementById('setup-view').style.display = 'none';
+    document.getElementById('host-view').style.display = 'block';
+    if(startTime) {
+      let hostTimeDiv = document.getElementById('host-time-display');
+      hostTimeDiv.innerText = "Game Set For: " + formatAMPM(startTime);
+      hostTimeDiv.style.display = "block";
+    }
+    announceVoice("Game setup complete");
+    listenToGameState();
+  }
+
+  function createPlayerLink() {
+    let name = document.getElementById('p-name').value.trim();
+    let count = parseInt(document.getElementById('p-count').value);
+    if(!name || !count) { alert("Enter Name and Ticket Count"); return; }
+    let safeNameForId = name.replace(/[^a-zA-Z0-9]/g, '_');
+    let pId = safeNameForId + "_" + Date.now(); 
+    let btn = document.getElementById('generate-link-btn');
+    btn.disabled = true; btn.innerText = "Generating...";
+
+    db.ref('games/' + gameId + '/globalTicketCount').once('value').then(snap => {
+      let currentGlobalCount = snap.val() || 0;
+      let tickets = [];
+      for(let i=0; i<count; i++) {
+        currentGlobalCount++;
+        tickets.push({ tNum: currentGlobalCount, grid: generateTicketArray() });
+      }
+      db.ref('games/' + gameId).update({ globalTicketCount: currentGlobalCount });
+      return db.ref(`games/${gameId}/tickets/${pId}`).set({ name: name, data: tickets });
+    }).then(() => {
+      let currentUrl = window.location.href.split('?')[0];
+      let baseUrl = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
+      if(!baseUrl) baseUrl = currentUrl; 
+      
+      // Data Encrypted completely to avoid game details in URL
+      let secretData = btoa(gameId + "|" + pId);
+      let link = `${baseUrl}/play.html?t=${secretData}`;
+
+      document.getElementById('link-output').innerHTML = `
+        <div class="link-box">
+          <strong>Send this to ${name}:</strong><br><br>
+          <a href="${link}" target="_blank" style="word-break: break-all;">${link}</a><br><br>
+          <button class="btn blue" onclick="navigator.clipboard.writeText('${link}'); alert('Link Copied!');">Copy Link</button>
+        </div>
+      `;
+      document.getElementById('p-name').value = '';
+    }).catch(() => { alert("Error generating link."); }).finally(() => { btn.disabled = false; btn.innerText = "Generate Link"; });
+  }
+
+  function addExtraTicket(pId, playerName) {
+    db.ref('games/' + gameId + '/globalTicketCount').once('value').then(snap => {
+      let currentGlobalCount = snap.val() || 0;
+      currentGlobalCount++;
+      db.ref('games/' + gameId).update({ globalTicketCount: currentGlobalCount });
+      db.ref(`games/${gameId}/tickets/${pId}/data`).once('value').then(tSnap => {
+        let existing = tSnap.val() || [];
+        existing.push({ tNum: currentGlobalCount, grid: generateTicketArray() });
+        db.ref(`games/${gameId}/tickets/${pId}/data`).set(existing);
+      });
+    });
+  }
+
+  function endGame() {
+    if(confirm("Are you sure you want to end this game?")) {
+      db.ref('games/' + gameId).update({ status: 'ended' });
+      clearInterval(autoPlayTimer);
+      localStorage.removeItem('tambola_live_host_game'); 
+      alert("Game Over! Ready for a new game.");
+      window.location.reload(); 
+    }
+  }
+
+  function drawSingle() {
+    if(allNumbers.length === 0) return alert("All numbers drawn!");
+    let num = allNumbers.pop();
+    calledNumbers.push(num);
+    db.ref('games/' + gameId).update({ currentDraw: num, called: calledNumbers });
+  }
+
+  function drawSpecificNumber(num) {
+    if (calledNumbers.includes(num)) return; 
+    if (confirm("Announce number " + num + "?")) {
+      allNumbers = allNumbers.filter(n => n !== num);
+      calledNumbers.push(num);
+      db.ref('games/' + gameId).update({ currentDraw: num, called: calledNumbers });
+    }
+  }
+
+  function toggleAutoPlay() {
+    let btn = document.getElementById('auto-play-btn');
+    if (autoPlayTimer) {
+      clearInterval(autoPlayTimer); autoPlayTimer = null;
+      btn.innerText = "▶ AUTO PLAY"; btn.classList.remove('red');
+    } else {
+      drawSingle(); 
+      autoPlayTimer = setInterval(drawSingle, 4000); 
+      btn.innerText = "⏸ STOP AUTO"; btn.classList.add('red');
+    }
+  }
+
+  function listenToGameState() {
+    db.ref('games/' + gameId).on('value', snapshot => {
+      let data = snapshot.val();
+      if(!data) { localStorage.removeItem('tambola_live_host_game'); window.location.reload(); return; }
+      if (data.status === 'ended') localStorage.removeItem('tambola_live_host_game');
+      
+      let newNum = data.currentDraw;
+      calledNumbers = data.called || [];
+      if(allNumbers.length === 0 && calledNumbers.length < 91) allNumbers = reconstructPool(calledNumbers);
+      allNumbers = allNumbers.filter(n => !calledNumbers.includes(n));
+      
+      if(newNum > 0) {
+        document.getElementById('host-current-num').innerText = newNum;
+        if (newNum !== window.lastAnnouncedNumber) {
+          announceVoice(newNum);
+          window.lastAnnouncedNumber = newNum;
+        }
+        updateBoardsColors(newNum, calledNumbers);
+        updateRecentNumbersUI(calledNumbers); 
+        markAllTicketsUI(); 
+      }
+    });
+
+    db.ref(`games/${gameId}/tickets`).on('value', snapshot => {
+      document.getElementById('host-tickets-area').innerHTML = '';
+      snapshot.forEach(child => renderTickets(child.val().data, child.val().name, child.key));
+      markAllTicketsUI();
+    });
+  }
+
+  function announceVoice(text) {
+    if ('speechSynthesis' in window) {
+      setTimeout(() => {
+        window.speechSynthesis.cancel();
+        let msg = new SpeechSynthesisUtterance(typeof text === 'number' ? "Number is " + text : text);
+        msg.lang = 'en-IN'; msg.rate = 0.9;
+        window.speechSynthesis.speak(msg);
+      }, 10);
+    }
+  }
+
+  function updateRecentNumbersUI(calledArray) {
+    let actualCalls = calledArray.filter(n => n > 0);
+    let last5 = actualCalls.slice(-5).reverse(); 
+    let html = '';
+    last5.forEach((num, i) => html += `<div class="recent-circle${i===0?' latest':''}">${num}</div>`);
+    document.getElementById('host-recent-nums').innerHTML = html;
+  }
+
+  function updateBoardsColors(current, calledArray) {
+    for(let i=1; i<=90; i++) {
+      let hCell = document.getElementById('hb-'+i);
+      if(hCell) {
+        hCell.className = 'b-cell';
+        if(i === current) hCell.classList.add('current');
+        else if(calledArray.includes(i)) hCell.classList.add('called');
+      }
+    }
+  }
+
+  function markAllTicketsUI() {
+    document.querySelectorAll('#host-tickets-area .t-cell.num').forEach(cell => {
+      if(calledNumbers.includes(parseInt(cell.innerText))) cell.classList.add('marked');
+    });
+  }
+
+  function renderTickets(ticketsArray, name, pId) {
+    let container = document.getElementById('host-tickets-area');
+    ticketsArray.forEach((tObj, index) => {
+      let wrap = document.createElement('div'); wrap.className = 'ticket-wrap';
+      let headHTML = `<span>${name} - Ticket ${tObj.tNum}</span><div>
+        <button class="add-btn" onclick="addExtraTicket('${pId}', '${name}')">+1</button>
+        <button class="cancel-btn" onclick="cancelSpecificTicket('${pId}', ${index})">DEL</button>
+      </div>`;
+      let head = document.createElement('div'); head.className = 't-head'; head.innerHTML = headHTML;
+      let grid = document.createElement('div'); grid.className = 't-grid';
+      for(let r=0; r<3; r++) {
+        for(let c=0; c<9; c++) {
+          let cell = document.createElement('div');
+          if(tObj.grid[r][c] === 0) { cell.className = 't-cell empty'; } 
+          else { cell.className = 't-cell num'; cell.innerText = tObj.grid[r][c]; }
+          grid.appendChild(cell);
+        }
+      }
+      wrap.appendChild(head); wrap.appendChild(grid); container.appendChild(wrap);
+    });
+  }
+
+  function cancelSpecificTicket(pId, ticketIndex) {
+    if(confirm("Are you sure you want to cancel THIS specific ticket?")) {
+      db.ref(`games/${gameId}/tickets/${pId}`).once('value', snapshot => {
+        let pData = snapshot.val();
+        if (pData && pData.data) {
+          pData.data.splice(ticketIndex, 1); 
+          if (pData.data.length === 0) db.ref(`games/${gameId}/tickets/${pId}`).remove(); 
+          else db.ref(`games/${gameId}/tickets/${pId}`).set(pData); 
+        }
+      });
+    }
+  }
+
+  function generateTicketArray() {
+    let ticket = Array.from({ length: 3 }, () => Array(9).fill(0));
+    let colRanges = [[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+    let colCounts = Array(9).fill(0);
+    for (let r = 0; r < 3; r++) {
+      let pickedCols = [], numbersInRow = 0;
+      let remainingCols = colRanges.map((_, i) => colCounts[i] === 0 ? i : -1).filter(i => i !== -1);
+      while (numbersInRow < 5) {
+        let colIdx = (remainingCols.length > 0 && numbersInRow < remainingCols.length) ? remainingCols[numbersInRow] : Math.floor(Math.random() * 9);
+        if (!pickedCols.includes(colIdx) && colCounts[colIdx] < 3) {
+          pickedCols.push(colIdx); colCounts[colIdx]++; numbersInRow++;
+          remainingCols = remainingCols.filter(i => i !== colIdx);
+        }
+      }
+      pickedCols.sort((a,b) => a-b).forEach(c => {
+        let num;
+        do { num = Math.floor(Math.random() * (colRanges[c][1] - colRanges[c][0] + 1)) + colRanges[c][0]; } 
+        while (ticket[0][c] === num || ticket[1][c] === num || ticket[2][c] === num); 
+        ticket[r][c] = num;
+      });
+    }
+    for (let c = 0; c < 9; c++) {
+      let colNums = [];
+      for (let r = 0; r < 3; r++) if (ticket[r][c] !== 0) colNums.push(ticket[r][c]);
+      if(colNums.length > 1) { colNums.sort((a,b) => a-b); let vIdx = 0; for (let r = 0; r < 3; r++) if (ticket[r][c] !== 0) ticket[r][c] = colNums[vIdx++]; }
+    }
+    return ticket;
+  }
+</script>
+</body>
+</html>
