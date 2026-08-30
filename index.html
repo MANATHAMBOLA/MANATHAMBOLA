@@ -18,9 +18,15 @@
   .input-box { padding: 10px; font-size: 16px; width: 150px; margin: 5px; border: 1px solid #ccc; border-radius: 4px; }
   
   .panel { background: white; padding: 15px; margin: 15px auto; max-width: 600px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-  .big-number { font-size: 70px; color: #d32f2f; font-weight: bold; margin: 10px; }
+  .big-number { font-size: 70px; color: #d32f2f; font-weight: bold; margin: 5px; }
   .link-box { background: #e3f2fd; padding: 15px; border: 1px dashed #2196f3; word-break: break-all; margin-top: 10px; font-size: 14px; }
   
+  /* Recent 5 Numbers Style */
+  .recent-box { background: #fff3e0; border: 2px solid #ff9800; padding: 10px; margin: 10px auto 20px; max-width: 400px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .recent-label { font-size: 16px; font-weight: bold; color: #e65100; }
+  .recent-circle { width: 40px; height: 40px; border-radius: 50%; background: #ffb74d; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; border: 2px solid #f57c00; }
+  .recent-circle.latest { background: #f44336; border-color: #d32f2f; }
+
   .ticket-wrap { border: 3px solid #6a1b9a; margin: 15px auto; background: white; max-width: 500px; }
   .t-head { background: #f3e5f5; color: #4a148c; padding: 8px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
   .cancel-btn { background: #f44336; color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 12px; border-radius: 3px; font-weight: bold;}
@@ -71,6 +77,13 @@
   <div class="panel">
     <h2>Host Dashboard</h2>
     <div id="host-current-num" class="big-number">--</div>
+    
+    <!-- Host Recent 5 Box -->
+    <div class="recent-box">
+      <div class="recent-label">Last 5:</div>
+      <div id="host-recent-nums" style="display:flex; gap:8px;"></div>
+    </div>
+
     <button id="auto-play-btn" class="btn" onclick="toggleAutoPlay()">▶ AUTO PLAY</button>
     <button class="btn blue" onclick="drawSingle()">DRAW RANDOM</button>
     <button class="btn dark" onclick="endGame()">GAME OVER</button>
@@ -100,6 +113,13 @@
   <div class="panel">
     <h2 id="player-welcome-name"></h2>
     <div id="player-current-num" class="big-number">--</div>
+    
+    <!-- Player Recent 5 Box -->
+    <div class="recent-box">
+      <div class="recent-label">Last 5:</div>
+      <div id="player-recent-nums" style="display:flex; gap:8px;"></div>
+    </div>
+
     <div class="board" id="player-board"></div>
   </div>
   <h3>Your Tickets (Tap to Tick)</h3>
@@ -147,7 +167,6 @@
     }
   };
 
-  // Create vertical board (1-90)
   function createBoardUI(containerId, isHostBoard) {
     let board = document.getElementById(containerId);
     board.innerHTML = '';
@@ -157,7 +176,6 @@
       c.className = 'b-cell' + (isHostBoard ? ' host-clickable' : ''); 
       c.innerText = i;
       
-      // Host manual click draw function
       if(isHostBoard) {
         c.onclick = () => drawSpecificNumber(i);
       }
@@ -170,7 +188,6 @@
     if(!gameId) gameId = "001";
     document.getElementById('display-game-id').innerText = "Game Number: " + gameId;
     
-    // Initialize pool
     allNumbers = Array.from({length: 90}, (_, i) => i + 1);
     for (let i = allNumbers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -237,10 +254,9 @@
   }
 
   function drawSpecificNumber(num) {
-    if (calledNumbers.includes(num)) return; // Don't call already called numbers
+    if (calledNumbers.includes(num)) return; 
     
     if (confirm("Do you want to announce number " + num + "?")) {
-      // Remove from pool so auto-draw doesn't pick it again
       allNumbers = allNumbers.filter(n => n !== num);
       calledNumbers.push(num);
       db.ref('games/' + gameId).update({ currentDraw: num, called: calledNumbers });
@@ -290,7 +306,6 @@
       let newNum = data.currentDraw;
       calledNumbers = data.called || [];
       
-      // Keep Host pool in sync with database called numbers
       if(isHost) {
         allNumbers = allNumbers.filter(n => !calledNumbers.includes(n));
       }
@@ -305,6 +320,7 @@
         }
         
         updateBoardsColors(newNum, calledNumbers);
+        updateRecentNumbersUI(calledNumbers); // Last 5 update function call
         if (isHost) markAllTicketsUI(); 
       }
     });
@@ -342,6 +358,25 @@
     }
   }
 
+  // Last 5 Numbers UI Logic
+  function updateRecentNumbersUI(calledArray) {
+    let actualCalls = calledArray.filter(n => n > 0);
+    let last5 = actualCalls.slice(-5).reverse(); // Reverse to show latest first
+    
+    let html = '';
+    last5.forEach((num, index) => {
+      // First number (latest) gets red styling, rest get orange
+      let extraClass = index === 0 ? ' latest' : '';
+      html += `<div class="recent-circle${extraClass}">${num}</div>`;
+    });
+    
+    let hr = document.getElementById('host-recent-nums');
+    if (hr) hr.innerHTML = html;
+    
+    let pr = document.getElementById('player-recent-nums');
+    if (pr) pr.innerHTML = html;
+  }
+
   function updateBoardsColors(current, calledArray) {
     for(let i=1; i<=90; i++) {
       let pCell = document.getElementById('pb-'+i);
@@ -373,7 +408,6 @@
       let wrap = document.createElement('div'); wrap.className = 'ticket-wrap';
       let headHTML = `<span>${name} - Ticket ${index+1}</span>`;
       
-      // Individual ticket cancel button
       if(isHostView) headHTML += `<button class="cancel-btn" onclick="cancelSpecificTicket('${pId}', ${index})">CANCEL THIS</button>`;
       
       let head = document.createElement('div'); head.className = 't-head'; head.innerHTML = headHTML;
@@ -412,12 +446,12 @@
       db.ref(`games/${gameId}/tickets/${pId}`).once('value', snapshot => {
         let pData = snapshot.val();
         if (pData && pData.data) {
-          pData.data.splice(ticketIndex, 1); // Remove only that ticket
+          pData.data.splice(ticketIndex, 1); 
           
           if (pData.data.length === 0) {
-            db.ref(`games/${gameId}/tickets/${pId}`).remove(); // Delete player if no tickets left
+            db.ref(`games/${gameId}/tickets/${pId}`).remove(); 
           } else {
-            db.ref(`games/${gameId}/tickets/${pId}`).set(pData); // Update remaining tickets
+            db.ref(`games/${gameId}/tickets/${pId}`).set(pData); 
           }
         }
       });
