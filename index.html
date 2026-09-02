@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>THAMBOLA HOST PRO</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f0f2f5; padding-bottom: 70px; }
+  .header { background: #1565c0; color: white; padding: 15px; font-size: 22px; font-weight: bold; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2);}
+  .container { padding: 15px; }
+  .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; animation: fadeIn 0.3s; }
+  .input-box { width: 100%; padding: 12px; font-size: 16px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+  .btn { width: 100%; padding: 14px; font-size: 16px; color: white; background: #4caf50; border: none; border-radius: 8px; cursor: pointer; margin: 5px 0; font-weight: bold; text-transform: uppercase; }
+  .btn.blue { background: #1976d2; } .btn.red { background: #d32f2f; } .btn.dark { background: #37474f; } .btn.orange { background: #f57c00; }
+  
+  .bottom-nav { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; }
+  .nav-item { flex: 1; text-align: center; font-size: 12px; color: #555; font-weight: bold; cursor: pointer; }
+  .nav-item.active { color: #1565c0; }
+  .nav-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+  .big-number { font-size: 80px; color: #d32f2f; font-weight: bold; text-align: center; margin: 10px 0; }
+  .board { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; margin: 15px 0; }
+  .b-cell { background: #fff; border: 1px solid #cfd8dc; padding: 10px 0; font-size: 14px; font-weight: bold; text-align: center; border-radius: 4px; cursor: pointer; }
+  .b-cell.called { background: #ffeb3b; border-color: #fbc02d; }
+  .b-cell.current { background: #f44336; color: white; border-color: #c62828; }
+  
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  
+  .data-card { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 15px; margin-bottom: 10px; border-radius: 4px; text-align: left; word-break: break-all;}
+  
+  /* Tickets styling */
+  .ticket-wrap { border: 2px solid #1565c0; margin: 15px 0; background: white; border-radius: 8px; overflow: hidden; position: relative;}
+  .t-head { background: #e3f2fd; color: #0d47a1; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 14px;}
+  .t-grid { display: grid; grid-template-columns: repeat(9, 1fr); border-top: 2px solid #1565c0; }
+  .t-cell { border: 1px solid #ccc; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; user-select: none; }
+  .t-cell.empty { background: #fafafa; border-color: transparent; }
+  .t-cell.marked { background: #4caf50 !important; color: white; border-radius:50%; transform: scale(0.85); }
+  
+  /* Ticket Buttons */
+  .action-btns { display: flex; gap: 5px; }
+  .t-btn { border: none; padding: 5px 8px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; color: white;}
+  .btn-add { background: #1976d2; } .btn-del { background: #d32f2f; }
+  
+  .cancelled-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; color: red; font-size: 24px; font-weight: bold; transform: rotate(-10deg); pointer-events: none; z-index: 10;}
+  
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  #toast-container { position: fixed; top: 20px; right: 20px; left: 20px; z-index: 1000; }
+  .toast { background: #37474f; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; border-left: 5px solid #4caf50; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+</style>
+</head>
+<body>
+
+<div class="header">HOST PANEL</div>
+<div id="toast-container"></div>
+
+<!-- LOGIN -->
+<div id="login-view" class="container tab-content active">
+  <div class="panel">
+    <h2 style="color: #d32f2f; text-align:center;">Security Login</h2>
+    <input type="password" id="host-pin" class="input-box" style="text-align:center; font-size: 24px;" placeholder="****">
+    <button class="btn blue" onclick="verifyHostPIN()">UNLOCK</button>
+  </div>
+</div>
+
+<!-- HOST TABS -->
+<div id="app-view" style="display:none;">
+  
+  <!-- TAB 1: SETUP -->
+  <div id="tab-setup" class="container tab-content active">
+    <div class="panel">
+      <h3>Create New Game</h3>
+      <label>Game ID (Name/Number)</label>
+      <input type="text" id="custom-game-id" class="input-box" value="GAME_01">
+      
+      <label>Max Housies Allowed</label>
+      <input type="number" id="max-housies" class="input-box" value="4">
+      
+      <label>Scheduled Start Time (Optional)</label>
+      <input type="datetime-local" id="start-time" class="input-box">
+      
+      <label>Gift Image (Optional - Max 1MB)</label>
+      <input type="file" id="gift-image" class="input-box" accept="image/*" onchange="encodeImage(this)">
+      <input type="hidden" id="gift-base64">
+      <p id="image-status" style="color:green; font-size:12px; display:none;">Image Loaded Successfully!</p>
+      
+      <button class="btn blue" style="margin-top:20px;" onclick="initHostGame()">START NEW GAME</button>
+    </div>
+  </div>
+
+  <!-- TAB 2: LIVE GAME -->
+  <div id="tab-live" class="container tab-content">
+    <div class="panel" style="text-align:center;">
+      <h3 style="margin-top:0; color:#1565c0;" id="live-game-title">No Active Game</h3>
+      
+      <!-- FORCE START BUTTON -->
+      <button id="force-start-btn" class="btn orange" style="display:none; margin-bottom:15px; animation: fadeIn 0.5s;" onclick="forceStartGame()">🚀 FORCE START NOW</button>
+      
+      <div style="background:#e8f5e9; padding:10px; border-radius:8px; border:2px dashed #4caf50; margin-bottom:15px;">
+        <button id="mic-btn" class="btn dark" onclick="toggleMic()">🎤 MIC: OFF</button>
+        <p style="font-size:12px; color:#555; margin:5px 0 0 0;">(Requires microphone permission)</p>
+      </div>
+      
+      <div id="host-current-num" class="big-number">--</div>
+      
+      <div style="display:flex; gap:10px;">
+        <button id="auto-play-btn" class="btn" onclick="toggleAutoPlay()">▶ AUTO</button>
+        <button class="btn blue" onclick="drawSingle()">DRAW</button>
+      </div>
+      <button class="btn red" style="margin-top: 15px;" onclick="endGame()">GAME OVER</button>
+    </div>
+    
+    <div class="panel">
+      <h3 style="margin-top:0;">Board (Tap to call)</h3>
+      <div class="board" id="host-board"></div>
+    </div>
+    
+    <div class="panel">
+      <h3>Add Player</h3>
+      <input type="text" id="p-name" class="input-box" placeholder="Player Name">
+      <input type="number" id="p-count" class="input-box" placeholder="Tickets Count">
+      <button class="btn blue" onclick="createPlayerLink()">GENERATE TICKET LINK</button>
+      <div id="link-output" style="margin-top:15px;"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Live Tickets Panel</h3>
+      <div id="host-tickets-area"><i>No tickets generated yet.</i></div>
+    </div>
+  </div>
+
+  <!-- TAB 3: WINNERS DATA -->
+  <div id="tab-winners" class="container tab-content">
+    <div class="panel">
+      <h3>Winner Addresses (Current Game)</h3>
+      <div id="winners-address-list">No data yet.</div>
+    </div>
+  </div>
+
+  <!-- TAB 4: HISTORY -->
+  <div id="tab-history" class="container tab-content">
+    <div class="panel">
+      <h3>Past Games</h3>
+      <div id="history-list">Loading...</div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAVIGATION -->
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('tab-setup', this)">
+      <span class="nav-icon">⚙️</span>Setup
+    </div>
+    <div class="nav-item" onclick="switchTab('tab-live', this)">
+      <span class="nav-icon">🔴</span>Live
+    </div>
+    <div class="nav-item" onclick="switchTab('tab-winners', this)">
+      <span class="nav-icon">🏆</span>Gifts
+    </div>
+    <div class="nav-item" onclick="switchTab('tab-history', this)">
+      <span class="nav-icon">📜</span>History
+    </div>
+  </div>
+</div>
+
+<script>
+  // FIREBASE CONFIGURATION
+  const firebaseConfig = {
+    apiKey: "AIzaSyAvjFcKKiu4OMmQckYXMTejdBJh9tC6TjM",
+    authDomain: "sri-vishnu-priya-finance-c591f.firebaseapp.com",
+    databaseURL: "https://sri-vishnu-priya-finance-c591f-default-rtdb.firebaseio.com",
+    projectId: "sri-vishnu-priya-finance-c591f",
+    storageBucket: "sri-vishnu-priya-finance-c591f.firebasestorage.app",
+    messagingSenderId: "184676228358",
+    appId: "1:184676228358:web:c2b32b68debeeadadfd287"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let gameId, autoPlayTimer = null, allNumbers = [], calledNumbers = [];
+  let isMicOn = false, mediaRecorder;
+  const SECRET_HOST_PIN = "7777"; 
+
+  window.onload = () => {
+    let savedHostGame = localStorage.getItem('tambola_live_host_game');
+    if(savedHostGame) {
+      gameId = savedHostGame;
+      document.getElementById('login-view').classList.remove('active');
+      document.getElementById('app-view').style.display = 'block';
+      switchTab('tab-live', document.querySelectorAll('.nav-item')[1]);
+      createBoardUI('host-board');
+      
+      if ('speechSynthesis' in window) { let msg = new SpeechSynthesisUtterance(""); window.speechSynthesis.speak(msg); }
+      
+      listenToGameState();
+      fetchHistory();
+    }
+  };
+
+  function verifyHostPIN() {
+    if(document.getElementById('host-pin').value === SECRET_HOST_PIN) {
+      document.getElementById('login-view').classList.remove('active');
+      document.getElementById('app-view').style.display = 'block';
+      fetchHistory();
+    } else { alert("Wrong PIN!"); document.getElementById('host-pin').value = ''; }
+  }
+
+  function switchTab(tabId, el) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    el.classList.add('active');
+  }
+
+  function showToast(message) {
+    let container = document.getElementById('toast-container');
+    let toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  function encodeImage(element) {
+    let file = element.files[0];
+    if(file.size > 1048576) { 
+      alert("Image is too large! Please choose an image smaller than 1MB.");
+      element.value = ''; return;
+    }
+    let reader = new FileReader();
+    reader.onloadend = () => { 
+      document.getElementById('gift-base64').value = reader.result; 
+      document.getElementById('image-status').style.display = 'block';
+    }
+    if(file) reader.readAsDataURL(file);
+  }
+
+  function initHostGame() {
+    gameId = document.getElementById('custom-game-id').value.trim();
+    if(!gameId) return alert("Please enter Game ID");
+    
+    let timeInput = document.getElementById('start-time').value;
+    let sTime = timeInput ? new Date(timeInput).getTime() : 0;
+    let gImage = document.getElementById('gift-base64').value || "";
+    
+    allNumbers = [];
+    for(let i=1;i<=90;i++) allNumbers.push(i);
+    allNumbers.sort(() => Math.random() - 0.5);
+    
+    db.ref('games/' + gameId).set({ 
+        status: 'active', 
+        currentDraw: 0, 
+        called: [0], 
+        globalTicketCount: 0, 
+        maxHousies: document.getElementById('max-housies').value || 4,
+        startTime: sTime, 
+        giftImage: gImage, 
+        createdAt: Date.now()
+    });
+    
+    localStorage.setItem('tambola_live_host_game', gameId);
+    createBoardUI('host-board');
+    switchTab('tab-live', document.querySelectorAll('.nav-item')[1]);
+    listenToGameState();
+    fetchHistory();
+    alert("Game Started Successfully!");
+  }
+
+  function forceStartGame() {
+    if(confirm("Force start the game immediately? This will remove the countdown for players.")) {
+      db.ref('games/' + gameId).update({ startTime: Date.now() });
+      document.getElementById('force-start-btn').style.display = 'none';
+    }
+  }
+
+  function listenToGameState() {
+    document.getElementById('live-game-title').innerText = "Playing: " + gameId;
+    
+    db.ref('games/' + gameId).on('value', snapshot => {
+      let data = snapshot.val();
+      if(!data) return;
+      if(data.status === 'ended') localStorage.removeItem('tambola_live_host_game');
+      
+      if(data.startTime && data.startTime > Date.now()) {
+        document.getElementById('force-start-btn').style.display = 'block';
+      } else {
+        document.getElementById('force-start-btn').style.display = 'none';
+      }
+
+      let newNum = data.currentDraw;
+      calledNumbers = data.called || [];
+      if(newNum > 0) {
+        document.getElementById('host-current-num').innerText = newNum;
+        updateBoardsColors();
+      }
+    });
+
+    db.ref(`games/${gameId}/tickets`).on('value', snapshot => {
+      let container = document.getElementById('host-tickets-area');
+      container.innerHTML = '';
+      let hasTickets = false;
+      snapshot.forEach(child => {
+        hasTickets = true;
+        let pData = child.val();
+        if(pData && pData.data) {
+          renderTickets(pData.data, pData.name, child.key);
+        }
+      });
+      if(!hasTickets) container.innerHTML = '<i>No tickets generated yet.</i>';
+    });
+
+    db.ref(`games/${gameId}/winnersDetails`).on('value', snap => {
+      let html = '';
+      snap.forEach(child => {
+        let d = child.val();
+        html += `<div class="data-card">
+          <h4 style="margin:0; color:#0d47a1;">${d.name} ${d.surname} (Ticket ${d.tNum})</h4>
+          <p style="margin:4px 0;">📞 ${d.mobile}</p>
+          <p style="margin:4px 0;">📍 ${d.village}, ${d.mandal}, ${d.pincode}</p>
+          <p style="margin:4px 0;">🏠 ${d.address}</p>
+        </div>`;
+      });
+      document.getElementById('winners-address-list').innerHTML = html || "No address details submitted yet.";
+    });
+
+    db.ref(`games/${gameId}/winners`).on('child_added', snap => {
+      let winner = snap.val();
+      showToast(`🎉 <b>${winner.name} (Ticket ${winner.tNum})</b> Claimed Housie!`);
+    });
+  }
+
+  function createBoardUI(containerId) {
+    let board = document.getElementById(containerId);
+    board.innerHTML = '';
+    for(let i=1; i<=90; i++) {
+      let c = document.createElement('div');
+      c.id = 'hb-' + i; c.className = 'b-cell'; c.innerText = i;
+      c.onclick = () => drawSpecificNumber(i);
+      board.appendChild(c);
+    }
+  }
+
+  function updateBoardsColors() {
+    for(let i=1; i<=90; i++) {
+      let hCell = document.getElementById('hb-'+i);
+      if(hCell) {
+        hCell.className = 'b-cell';
+        if(i === calledNumbers[calledNumbers.length-1]) hCell.classList.add('current');
+        else if(calledNumbers.includes(i)) hCell.classList.add('called');
+      }
+    }
+    document.querySelectorAll('#host-tickets-area .t-cell.num').forEach(cell => {
+      if(calledNumbers.includes(parseInt(cell.innerText))) cell.classList.add('marked');
+      else cell.classList.remove('marked');
+    });
+  }
+
+  function drawSingle() {
+    let uncalled = [];
+    for(let i=1;i<=90;i++) if(!calledNumbers.includes(i)) uncalled.push(i);
+    if(uncalled.length === 0) return alert("All numbers are drawn!");
+    let num = uncalled[Math.floor(Math.random()*uncalled.length)];
+    calledNumbers.push(num);
+    db.ref('games/' + gameId).update({ currentDraw: num, called: calledNumbers });
+    announceVoice(num);
+  }
+
+  function drawSpecificNumber(num) {
+    if (calledNumbers.includes(num)) return; 
+    calledNumbers.push(num);
+    db.ref('games/' + gameId).update({ currentDraw: num, called: calledNumbers });
+    announceVoice(num);
+  }
+
+  function toggleAutoPlay() {
+    let btn = document.getElementById('auto-play-btn');
+    if (autoPlayTimer) {
+      clearInterval(autoPlayTimer); autoPlayTimer = null;
+      btn.innerText = "▶ AUTO"; btn.classList.remove('red');
+    } else {
+      drawSingle(); autoPlayTimer = setInterval(drawSingle, 4000); 
+      btn.innerText = "⏸ STOP"; btn.classList.add('red');
+    }
+  }
+
+  function toggleMic() {
+    if(!isMicOn) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        let options = {};
+        if(MediaRecorder.isTypeSupported('audio/webm')) { options = {mimeType: 'audio/webm'}; }
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) { options = {mimeType: 'audio/mp4'}; }
+        
+        mediaRecorder = new MediaRecorder(stream, options);
+        mediaRecorder.ondataavailable = e => {
+          if(e.data.size > 0 && isMicOn) {
+            let reader = new FileReader();
+            reader.readAsDataURL(e.data);
+            reader.onloadend = () => db.ref(`games/${gameId}/audioStream`).set({ data: reader.result, ts: Date.now() });
+          }
+        };
+        mediaRecorder.start(1000); 
+        isMicOn = true;
+        document.getElementById('mic-btn').innerText = "🎤 MIC: ON (Live)";
+        document.getElementById('mic-btn').className = "btn red";
+      }).catch(err => alert("Microphone access denied!"));
+    } else {
+      if(mediaRecorder) { 
+        mediaRecorder.stop(); 
+        mediaRecorder.stream.getTracks().forEach(t=>t.stop()); 
+      }
+      isMicOn = false;
+      document.getElementById('mic-btn').innerText = "🎤 MIC: OFF";
+      document.getElementById('mic-btn').className = "btn dark";
+    }
+  }
+
+  function endGame() {
+    let confirmMsg = "🛑 WARNING: GAME OVER 🛑\n\nAre you SURE you want to end this game?\n- Players cannot play anymore.\n- Winners will be prompted to enter their Delivery Addresses.";
+    if(confirm(confirmMsg)) {
+      db.ref('games/' + gameId).update({ status: 'ended' });
+      clearInterval(autoPlayTimer); 
+      if(isMicOn) toggleMic();
+      localStorage.removeItem('tambola_live_host_game'); 
+      alert("Game Ended! Winners are filling out forms now. Check the 'Gifts' tab.");
+    }
+  }
+
+  // 100% FIXED: Instant Link Display WITHOUT Promise Blocking
+  function createPlayerLink() {
+    let name = document.getElementById('p-name').value.trim();
+    let count = parseInt(document.getElementById('p-count').value);
+    
+    if(!name || !count) return alert("Please enter Player Name and Tickets Count");
+    
+    let pId = name.replace(/[^a-zA-Z0-9]/g, '_') + "_" + Date.now(); 
+    let currentUrl = window.location.href.split('?')[0].split('#')[0].replace(/\/index\.html$/, '').replace(/\/$/, '');
+    let link = `${currentUrl}/play.html?t=${btoa(encodeURIComponent(gameId+"|"+pId))}`;
+    
+    // Display link instantly on UI
+    document.getElementById('link-output').innerHTML = `
+      <div class="data-card" style="border-left: 4px solid #4caf50;">
+          <b style="color:#2e7d32;">✅ Link Generated for ${name}:</b><br><br>
+          <a href="${link}" target="_blank" style="word-break:break-all; font-size:14px;">${link}</a><br><br>
+          <button class="btn blue" onclick="navigator.clipboard.writeText('${link}'); alert('Link Copied Successfully!');">COPY LINK</button>
+      </div>`;
+    document.getElementById('p-name').value = '';
+
+    // Upload to Firebase completely in the background
+    setTimeout(() => {
+        db.ref('games/' + gameId + '/globalTicketCount').once('value', snap => {
+          let gCount = snap.val() || 0; 
+          let tickets = [];
+          for(let i=0; i<count; i++) { 
+            gCount++; 
+            tickets.push({ tNum: gCount, grid: generateUniqueTicketArray() }); 
+          }
+          db.ref('games/' + gameId).update({ globalTicketCount: gCount });
+          db.ref(`games/${gameId}/tickets/${pId}`).set({ name: name, data: tickets });
+        });
+    }, 10);
+  }
+
+  function addExtraTicket(pId, playerName) {
+    db.ref('games/' + gameId + '/globalTicketCount').once('value', snap => {
+      let currentGlobalCount = snap.val() || 0;
+      currentGlobalCount++;
+      db.ref('games/' + gameId).update({ globalTicketCount: currentGlobalCount });
+      
+      db.ref(`games/${gameId}/tickets/${pId}/data`).once('value', tSnap => {
+        let existing = tSnap.val() || [];
+        existing.push({ tNum: currentGlobalCount, grid: generateUniqueTicketArray() });
+        db.ref(`games/${gameId}/tickets/${pId}/data`).set(existing);
+      });
+    });
+  }
+
+  function cancelSpecificTicket(pId, ticketIndex) {
+    if(confirm("Are you sure you want to DELETE this specific ticket?")) {
+      db.ref(`games/${gameId}/tickets/${pId}/data`).once('value', snapshot => {
+        let pData = snapshot.val();
+        if (pData) {
+          pData.splice(ticketIndex, 1); 
+          if (pData.length === 0) db.ref(`games/${gameId}/tickets/${pId}`).remove(); 
+          else db.ref(`games/${gameId}/tickets/${pId}/data`).set(pData); 
+        }
+      });
+    }
+  }
+
+  function renderTickets(ticketsArray, name, pId) {
+    let container = document.getElementById('host-tickets-area');
+    ticketsArray.forEach((tObj, index) => {
+      let wrap = document.createElement('div'); wrap.className = 'ticket-wrap';
+      if(tObj.cancelled) wrap.innerHTML += `<div class="cancelled-overlay">CANCELLED</div>`;
+      
+      let headHTML = `
+        <span><b>${name}</b> (T.No ${tObj.tNum})</span>
+        <div class="action-btns">
+          <button class="t-btn btn-add" onclick="addExtraTicket('${pId}', '${name}')">+1 Ticket</button>
+          <button class="t-btn btn-del" onclick="cancelSpecificTicket('${pId}', ${index})">❌ DEL</button>
+        </div>`;
+        
+      let head = document.createElement('div'); head.className = 't-head'; head.innerHTML = headHTML;
+      let grid = document.createElement('div'); grid.className = 't-grid';
+      
+      for(let r=0; r<3; r++) {
+        for(let c=0; c<9; c++) {
+          let cell = document.createElement('div');
+          if(tObj.grid[r][c] === 0) { cell.className = 't-cell empty'; } 
+          else { 
+            cell.className = 't-cell num'; 
+            cell.innerText = tObj.grid[r][c]; 
+            if(calledNumbers.includes(tObj.grid[r][c])) cell.classList.add('marked');
+          }
+          grid.appendChild(cell);
+        }
+      }
+      wrap.appendChild(head); wrap.appendChild(grid); container.appendChild(wrap);
+    });
+  }
+
+  function fetchHistory() {
+    db.ref('games').once('value', snap => {
+      let html = '';
+      snap.forEach(child => {
+        let d = child.val();
+        let dt = new Date(d.createdAt).toLocaleString();
+        html += `<div class="data-card">
+            <h4 style="margin:0;">${child.key}</h4>
+            <p style="margin:4px 0;">Status: <b>${d.status}</b></p>
+            <p style="margin:4px 0;">Created: ${dt}</p>
+        </div>`;
+      });
+      document.getElementById('history-list').innerHTML = html;
+    });
+  }
+
+  function announceVoice(text) {
+    if ('speechSynthesis' in window && !isMicOn) {
+      window.speechSynthesis.cancel();
+      let msg = new SpeechSynthesisUtterance("Number " + text); msg.rate = 0.9;
+      window.speechSynthesis.speak(msg);
+    }
+  }
+
+  function generateUniqueTicketArray() {
+    let ticket = Array.from({ length: 3 }, () => Array(9).fill(0));
+    let colRanges = [[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+    let colCounts = Array(9).fill(0);
+    for (let r = 0; r < 3; r++) {
+      let availableCols = [0,1,2,3,4,5,6,7,8].filter(i => colCounts[i] < (r === 2 ? 3 : 2)).sort(()=>Math.random()-0.5).slice(0,5);
+      availableCols.sort((a,b)=>a-b).forEach(c => {
+        colCounts[c]++; let num;
+        do { num = Math.floor(Math.random() * (colRanges[c][1] - colRanges[c][0] + 1)) + colRanges[c][0]; } 
+        while (ticket[0][c] === num || ticket[1][c] === num || ticket[2][c] === num); 
+        ticket[r][c] = num;
+      });
+    }
+    for (let c = 0; c < 9; c++) {
+      let colNums = [];
+      for (let r = 0; r < 3; r++) if (ticket[r][c] !== 0) colNums.push(ticket[r][c]);
+      if(colNums.length > 1) { colNums.sort((a,b) => a-b); let vIdx = 0; for (let r = 0; r < 3; r++) if (ticket[r][c] !== 0) ticket[r][c] = colNums[vIdx++]; }
+    }
+    return ticket;
+  }
+</script>
+</body>
+</html>
