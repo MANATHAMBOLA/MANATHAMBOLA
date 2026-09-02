@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>THAMBOLA HOST PRO</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f0f2f5; padding-bottom: 70px; }
+  .header { background: #1565c0; color: white; padding: 15px; font-size: 22px; font-weight: bold; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2);}
+  .container { padding: 15px; }
+  .panel { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; animation: fadeIn 0.3s; }
+  .input-box { width: 100%; padding: 12px; font-size: 16px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+  .btn { width: 100%; padding: 14px; font-size: 16px; color: white; background: #4caf50; border: none; border-radius: 8px; cursor: pointer; margin: 5px 0; font-weight: bold; text-transform: uppercase; }
+  .btn.blue { background: #1976d2; } .btn.red { background: #d32f2f; } .btn.dark { background: #37474f; } .btn.orange { background: #f57c00; }
+  
+  .bottom-nav { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; }
+  .nav-item { flex: 1; text-align: center; font-size: 12px; color: #555; font-weight: bold; cursor: pointer; }
+  .nav-item.active { color: #1565c0; }
+  .nav-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+
+  .big-number { font-size: 70px; color: #d32f2f; font-weight: bold; text-align: center; margin: 10px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+  
+  .board-wrapper { display: flex; gap: 2px; justify-content: space-between; overflow-x: auto; margin: 15px 0; background: white; border-radius: 8px;}
+  .board-col { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .b-cell { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #b0bec5; font-size: 13px; font-weight: bold; border-radius: 3px; cursor: pointer; color:#333; }
+  .b-cell.called { background: #ffeb3b; border-color: #fbc02d; }
+  .b-cell.current { background: #f44336; color: white; border-color: #c62828; transform: scale(1.1); box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index:2;}
+  
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  
+  .data-card { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 15px; margin-bottom: 10px; border-radius: 4px; text-align: left; word-break: break-all;}
+  
+  .ticket-wrap { border: 2px solid #1565c0; margin: 15px 0; background: white; border-radius: 8px; overflow: hidden; position: relative;}
+  .t-head { background: #e3f2fd; color: #0d47a1; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 14px;}
+  .t-grid { display: grid; grid-template-columns: repeat(9, 1fr); border-top: 2px solid #1565c0; }
+  .t-cell { border: 1px solid #9e9e9e; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; user-select: none; }
+  .t-cell.empty { background: #f5f5f5; }
+  .t-cell.marked { background: #4caf50 !important; color: white; border-radius:50%; transform: scale(0.85); box-shadow:0 2px 4px rgba(0,0,0,0.2);}
+  
+  .action-btns { display: flex; gap: 5px; }
+  .t-btn { border: none; padding: 5px 8px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; color: white;}
+  .btn-add { background: #1976d2; } .btn-del { background: #d32f2f; }
+  
+  .cancelled-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; color: red; font-size: 24px; font-weight: bold; transform: rotate(-10deg); pointer-events: none; z-index: 10;}
+  
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  
+  #toast-container { position: fixed; top: 20px; right: 20px; left: 20px; z-index: 2000; }
+  .toast { background: #37474f; color: white; padding: 15px 40px 15px 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; border-left: 6px solid #4caf50; box-shadow: 0 6px 12px rgba(0,0,0,0.3); position: relative; font-size:15px; }
+  .toast.urgent { border-left-color: #f44336; background: #b71c1c; }
+  .toast-close { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 20px; background: rgba(255,255,255,0.3); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  
+  /* Winner Selection Modal */
+  .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); }
+  .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;}
+  .claim-item { background: #f5f5f5; padding: 15px; margin-bottom: 10px; border-radius: 8px; border: 2px solid #e0e0e0; display: flex; align-items: center; gap: 15px;}
+  .claim-item input[type="checkbox"] { width: 25px; height: 25px; accent-color: #4caf50; }
+</style>
+</head>
+<body>
+
+<div class="header">HOST PANEL</div>
+<div id="toast-container"></div>
+
+<!-- LOGIN -->
+<div id="login-view" class="container tab-content active">
+  <div class="panel">
+    <h2 style="color: #d32f2f; text-align:center;">Security Login</h2>
+    <input type="password" id="host-pin" class="input-box" style="text-align:center; font-size: 24px;" placeholder="****">
+    <button class="btn blue" onclick="verifyHostPIN()">UNLOCK</button>
+  </div>
+</div>
+
+<!-- HOST TABS -->
+<div id="app-view" style="display:none;">
+  
+  <!-- TAB 1: SETUP -->
+  <div id="tab-setup" class="container tab-content active">
+    <div class="panel">
+      <h3>Create New Game</h3>
+      <label>Game ID (Name/Number)</label>
+      <input type="text" id="custom-game-id" class="input-box" value="GAME_01">
+      
+      <label>Scheduled Start Time (Optional)</label>
+      <input type="datetime-local" id="start-time" class="input-box">
+      
+      <label>Gift Image (Optional)</label>
+      <input type="file" id="gift-image" class="input-box" accept="image/*" onchange="encodeImage(this)">
+      <input type="hidden" id="gift-base64">
+      <p id="image-status" style="color:green; font-size:12px; display:none;">Image Loaded Successfully!</p>
+      
+      <button class="btn blue" style="margin-top:20px;" onclick="initHostGame()">START NEW GAME</button>
+    </div>
+  </div>
+
+  <!-- TAB 2: LIVE GAME -->
+  <div id="tab-live" class="container tab-content">
+    <div class="panel" style="text-align:center;">
+      <h3 style="margin-top:0; color:#1565c0;" id="live-game-title">No Active Game</h3>
+      
+      <button id="force-start-btn" class="btn orange" style="display:none; margin-bottom:15px;" onclick="forceStartGame()">🚀 FORCE START NOW</button>
+      
+      <div style="background:#e8f5e9; padding:10px; border-radius:8px; border:2px dashed #4caf50; margin-bottom:15px;">
+        <button id="mic-btn" class="btn dark" onclick="toggleMic()">🎤 MIC: OFF</button>
+      </div>
+      
+      <div id="host-current-num" class="big-number">--</div>
+      
+      <div style="display:flex; gap:10px;">
+        <button id="auto-play-btn" class="btn" onclick="toggleAutoPlay()">▶ AUTO</button>
+        <button class="btn blue" onclick="drawSingle()">DRAW</button>
+      </div>
+      <button class="btn red" style="margin-top: 15px;" onclick="endGame()">🛑 GAME OVER & SELECT WINNERS</button>
+    </div>
+    
+    <div class="panel">
+      <h3 style="margin-top:0;">Board (Vertical)</h3>
+      <div class="board-wrapper" id="host-board"></div>
+    </div>
+    
+    <div class="panel">
+      <h3>Add Player</h3>
+      <input type="text" id="p-name" class="input-box" placeholder="Player Name">
+      <input type="number" id="p-count" class="input-box" placeholder="Tickets Count">
+      <button class="btn blue" onclick="createPlayerLink()">GENERATE LINK</button>
+      <div id="link-output" style="margin-top:15px;"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Live Tickets</h3>
+      <div id="host-tickets-area"><i>No tickets yet.</i></div>
+    </div>
+  </div>
+
+  <!-- TAB 3: WINNERS DATA (GIFTS) -->
+  <div id="tab-winners" class="container tab-content">
+    <div class="panel">
+      <h3 style="margin-top:0; color:#1565c0;">Winner Addresses</h3>
+      <p style="font-size:13px; color:#666;">Game అయిపోయాక ప్లేయర్స్ ఎంటర్ చేసిన డీటెయిల్స్ ఇక్కడే కనిపిస్తాయి.</p>
+      <div id="winners-address-list">No data yet.</div>
+    </div>
+  </div>
+
+  <!-- TAB 4: HISTORY -->
+  <div id="tab-history" class="container tab-content">
+    <div class="panel">
+      <h3 style="margin-top:0;">Past Games</h3>
+      <div id="history-list">Loading...</div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('tab-setup', this)"><span class="nav-icon">⚙️</span>Setup</div>
+    <div class="nav-item" onclick="switchTab('tab-live', this)"><span class="nav-icon">🔴</span>Live</div>
+    <div class="nav-item" onclick="switchTab('tab-winners', this)"><span class="nav-icon">🏆</span>Gifts</div>
+    <div class="nav-item" onclick="switchTab('tab-history', this)"><span class="nav-icon">📜</span>History</div>
+  </div>
+</div>
+
+<!-- WINNER SELECTION MODAL -->
+<div id="winner-modal" class="modal">
+  <div class="modal-content">
+    <h2 style="color:#d32f2f; margin-top:0; text-align:center;">🏆 Select Final Winners 🏆</h2>
+    <p style="font-size:14px; color:#555; text-align:center;">ఇక్కడ మీరు టిక్ చేసిన వాళ్ళే గేమ్ విజేతలుగా అందరికీ కనిపిస్తారు.</p>
+    
+    <div id="claims-list-modal" style="margin:20px 0;"></div>
+    
+    <button class="btn blue" style="width:100%;" onclick="confirmWinnersAndEnd()">CONFIRM WINNERS & END GAME</button>
+    <button class="btn dark" style="width:100%; margin-top:10px;" onclick="document.getElementById('winner-modal').style.display='none'">CANCEL (Go Back)</button>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAvjFcKKiu4OMmQckYXMTejdBJh9tC6TjM",
+    authDomain: "sri-vishnu-priya-finance-c591f.firebaseapp.com",
+    databaseURL: "https://sri-vishnu-priya-finance-c591f-default-rtdb.firebaseio.com",
+    projectId: "sri-vishnu-priya-finance-c591f",
+    storageBucket: "sri-vishnu-priya-finance-c591f.firebasestorage.app",
+    messagingSenderId: "184676228358",
+    appId: "1:184676228358:web:c2b32b68debeeadadfd287"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let gameId, autoPlayTimer = null, allNumbers = [], calledNumbers = [];
+  let isMicOn = false, mediaRecorder;
+  const SECRET_HOST_PIN = "7777"; 
+  let knownClaims = new Set();
+
+  window.onload = () => {
+    let savedHostGame = localStorage.getItem('tambola_live_host_game');
+    if(savedHostGame) {
+      gameId = savedHostGame;
+      document.getElementById('login-view').classList.remove('active');
+      document.getElementById('app-view').style.display = 'block';
+      switchTab('tab-live', document.querySelectorAll('.nav-item')[1]);
+      createBoardUI('host-board');
+      
+      if ('speechSynthesis' in window) { let msg = new SpeechSynthesisUtterance(""); window.speechSynthesis.speak(msg); }
+      listenToGameState();
+      fetchHistory();
+    }
+  };
+
+  function verifyHostPIN() {
+    if(document.getElementById('host-pin').value === SECRET_HOST_PIN) {
+      document.getElementById('login-view').classList.remove('active');
+      document.getElementById('app-view').style.display = 'block';
+      fetchHistory();
+    } else { alert("Wrong PIN!"); document.getElementById('host-pin').value = ''; }
+  }
+
+  function switchTab(tabId, el) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    el.classList.add('active');
+  }
+
+  function showPersistentToast(message, isUrgent = false) {
+    let container = document.getElementById('toast-container');
+    let toast = document.createElement('div');
+    toast.className = 'toast ' + (isUrgent ? 'urgent' : '');
+    toast.innerHTML = message + `<div class="toast-close" onclick="this.parentElement.remove()">❌</div>`;
+    container.appendChild(toast);
+  }
+
+  function encodeImage(element) {
+    let file = element.files[0];
+    if(file.size > 1048576) { 
+      alert("Image is too large! Please choose an image smaller than 1MB.");
+      element.value = ''; return;
+    }
+    let reader = new FileReader();
+    reader.onloadend = () => { 
+      document.getElementById('gift-base64').value = reader.result; 
+      document.getElementById('image-status').style.display = 'block';
+    }
+    if(file) reader.readAsDataURL(file);
+  }
+
+  function initHostGame() {
+    gameId = document.getElementById('custom-game-id').value.trim();
+    if(!gameId) return alert("Please enter Game ID");
+    
+    let timeInput = document.getElementById('start-time').value;
+    let sTime = timeInput ? new Date(timeInput).getTime() : 0;
+    let gImage = document.getElementById('gift-base64').value || "";
+    
+    allNumbers = [];
+    for(let i=1;i<=90;i++) allNumbers.push(i);
+    allNumbers.sort(() => Math.random() - 0.5);
+    knownClaims.clear();
+    
+    db.ref('games/' + gameId).set({ 
+        status: 'active', currentDraw: 0, called: [0], globalTicketCount: 0, 
+        startTime: sTime, giftImage: gImage, createdAt: Date.now()
+    });
+    
+    // Clear old claims/winners
+    db.ref(`games/${gameId}/claims`).remove();
+    db.ref(`games/${gameId}/winners`).remove();
+    
+    localStorage.setItem('tambola_live_host_game', gameId);
+    createBoardUI('host-board');
+    switchTab('tab-live', document.querySelectorAll('.nav-item')[1]);
+    listenToGameState();
+    fetchHistory();
+  }
+
+  function forceStartGame() {
+    if(confirm("Force start the game immediately?")) {
+      db.ref('games/' + gameId).update({ startTime: Date.now() });
+      document.getElementById('force-start-btn').style.display = 'none';
+    }
+  }
+
+  function listenToGameState() {
+    document.getElementById('live-game-title').innerText = "Playing: " + gameId;
+    
+    db.ref('games/' + gameId).on('value', snapshot => {
+      let data = snapshot.val();
+      if(!data) return;
+      if(data.status === 'ended') localStorage.removeItem('tambola_live_host_game');
+      
+      if(data.startTime && data.startTime > Date.now()) {
+        document.getElementById('force-start-btn').style.display = 'block';
+      } else {
+        document.getElementById('force-start-btn').style.display = 'none';
+      }
+
+      let newNum = data.currentDraw;
+      calledNumbers = data.called || [];
+      if(newNum > 0) {
+        document.getElementById('host-current-num').innerText = newNum;
+        updateBoardsColors();
+      }
+    });
+
+    db.ref(`games/${gameId}/tickets`).on('value', snapshot => {
+      let container = document.getElementById('host-tickets-area');
+      container.innerHTML = '';
+      let hasTickets = false;
+      snapshot.forEach(child => {
+        hasTickets = true;
+        let pData = child.val();
+        if(pData && pData.data) { renderTickets(pData.data, pData.name, child.key); }
+      });
+      if(!hasTickets) container.innerHTML = '<i>No tickets generated yet.</i>';
+    });
+
+    db.ref(`games/${gameId}/winnersDetails`).on('value', snap => {
+      let html = '';
+      snap.forEach(child => {
+        let d = child.val();
+        html += `<div class="data-card">
+          <h4 style="margin:0; color:#0d47a1;">${d.name} ${d.surname} (Ticket ${d.tNum})</h4>
+          <p style="margin:4px 0;">📞 ${d.mobile}</p>
+          <p style="margin:4px 0;">📍 ${d.village}, ${d.mandal}, ${d.pincode}</p>
+          <p style="margin:4px 0;">🏠 ${d.address}</p>
+        </div>`;
+      });
+      document.getElementById('winners-address-list').innerHTML = html || "No address details submitted yet.";
+    });
+
+    // LISTEN TO ALL CLAIMS FOR NOTIFICATION
+    db.ref(`games/${gameId}/claims`).on('child_added', snap => {
+      let claim = snap.val();
+      if(!knownClaims.has(snap.key)) {
+        knownClaims.add(snap.key);
+        
+        // Auto-pause
+        if (autoPlayTimer) { 
+           clearInterval(autoPlayTimer); autoPlayTimer = null;
+           document.getElementById('auto-play-btn').innerText = "▶ AUTO"; 
+           document.getElementById('auto-play-btn').classList.remove('red');
+        }
+        
+        showPersistentToast(`🛑 <b>HOUSIE CLAIMED!</b><br>Player: <b>${claim.name}</b> (T.No: ${claim.tNum})<br>Time: <b>${claim.time}</b><br><br><span style="color:#ffeb3b;">Game Auto-Paused!</span>`, true);
+      }
+    });
+  }
+
+  function createBoardUI(containerId) {
+    let board = document.getElementById(containerId);
+    board.innerHTML = '';
+    for(let c=0; c<9; c++) {
+      let colDiv = document.createElement('div');
+      colDiv.className = 'board-col';
+      let start = c * 10 + 1;
+      let end = (c === 8) ? 90 : (c + 1) * 10;
+      for(let i=start; i<=end; i++) {
+        let cell = document.createElement('div');
+        cell.className = 'b-cell';
+        cell.id = 'hb-' + i;
+        cell.innerText = i;
+        cell.onclick = () => drawSpecificNumber(i);
+        colDiv.appendChild(cell);
+      }
+      board.appendChild(colDiv);
+    }
+  }
+
+  function updateBoardsColors() {
+    for(let i=1; i<=90; i++) {
+      let hCell = document.getElementById('hb-'+i);
+      if(hCell) {
+        hCell.className = 'b-cell';
+        if(i === calledNumbers[calledNumbers.length-1]) hCell.classList.add('current');
+        else if(calledNumbers.includes(i)) hCell.classList.add('called');
+      }
+    }
+    document.querySelectorAll('#host-tickets-area .t-cell.num').forEach(cell => {
+      if(calledNumbers.includes(parseInt(cell.innerText))) cell.classList.add('marked');
+      else cell.classList.remove('marked');
+    });
+  }
+
+  function drawSingle() {
+    let uncalled = [];
+    for(let i=1;i<=90;i++) if(!calledNumbers.includes(i)) uncalled.push(i);
+    if(uncalled.length === 0) return alert("All numbers are drawn!");
+    let num = uncalled[Math.floor(Math.random()*uncalled.length)];
+    calledNumbers.push(num);
+    db.ref('games/' + gameId).update({ currentDraw: num, called: calledNumbers });
+    announceVoice(num);
+  }
+
+  function drawSpecificNumber(num) {
+    if (calledNumbers.includes(num)) return; 
+    calledNumbers.push(num);
+    db.ref('games/' + gameId).update({ currentDraw: num, called: calledNumbers });
+    announceVoice(num);
+  }
+
+  function toggleAutoPlay() {
+    let btn = document.getElementById('auto-play-btn');
+    if (autoPlayTimer) {
+      clearInterval(autoPlayTimer); autoPlayTimer = null;
+      btn.innerText = "▶ AUTO"; btn.classList.remove('red');
+    } else {
+      drawSingle(); autoPlayTimer = setInterval(drawSingle, 4000); 
+      btn.innerText = "⏸ STOP"; btn.classList.add('red');
+    }
+  }
+
+  function toggleMic() {
+    if(!isMicOn) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        let options = {};
+        if(MediaRecorder.isTypeSupported('audio/webm')) { options = {mimeType: 'audio/webm'}; }
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) { options = {mimeType: 'audio/mp4'}; }
+        
+        mediaRecorder = new MediaRecorder(stream, options);
+        mediaRecorder.ondataavailable = e => {
+          if(e.data.size > 0 && isMicOn) {
+            let reader = new FileReader();
+            reader.readAsDataURL(e.data);
+            reader.onloadend = () => db.ref(`games/${gameId}/audioStream`).set({ data: reader.result, ts: Date.now() });
+          }
+        };
+        mediaRecorder.start(1000); 
+        isMicOn = true;
+        document.getElementById('mic-btn').innerText = "🎤 MIC: ON (Live)";
+        document.getElementById('mic-btn').className = "btn red";
+      }).catch(err => alert("Microphone access denied!"));
+    } else {
+      if(mediaRecorder) { mediaRecorder.stop(); mediaRecorder.stream.getTracks().forEach(t=>t.stop()); }
+      isMicOn = false;
+      document.getElementById('mic-btn').innerText = "🎤 MIC: OFF";
+      document.getElementById('mic-btn').className = "btn dark";
+    }
+  }
+
+  // MODIFIED END GAME WITH WINNER SELECTION
+  function endGame() {
+    if(autoPlayTimer) toggleAutoPlay();
+    
+    db.ref(`games/${gameId}/claims`).once('value', snap => {
+        let claims = snap.val() || {};
+        let html = '';
+        
+        if(Object.keys(claims).length === 0) {
+            html = '<p style="text-align:center; color:red; font-weight:bold;">No Housie claims received yet.</p>';
+        } else {
+            for(let key in claims) {
+                let c = claims[key];
+                let safeData = JSON.stringify(c).replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+                html += `
+                <div class="claim-item">
+                    <input type="checkbox" class="winner-checkbox" value="${key}" data-obj='${safeData}' id="chk-${key}">
+                    <label for="chk-${key}" style="cursor:pointer; width:100%;">
+                        <b style="font-size:18px;">${c.name}</b> (Ticket: ${c.tNum})<br>
+                        <span style="font-size:14px; color:#555;">Claimed at: <b>${c.time}</b> | Drawn No: <b>${c.draw}</b></span>
+                    </label>
+                </div>`;
+            }
+        }
+        document.getElementById('claims-list-modal').innerHTML = html;
+        document.getElementById('winner-modal').style.display = 'block';
+    });
+  }
+
+  function confirmWinnersAndEnd() {
+      let selected = {};
+      document.querySelectorAll('.winner-checkbox:checked').forEach(chk => {
+          selected[chk.value] = JSON.parse(chk.getAttribute('data-obj').replace(/&quot;/g, '"').replace(/&apos;/g, "'"));
+      });
+
+      if(Object.keys(selected).length === 0 && !confirm("You haven't selected ANY winners. End the game anyway?")) {
+          return;
+      }
+
+      // Update final winners, then end game
+      db.ref(`games/${gameId}/winners`).set(selected).then(() => {
+          db.ref(`games/${gameId}`).update({ status: 'ended' });
+          if(isMicOn) toggleMic();
+          document.getElementById('winner-modal').style.display = 'none';
+          localStorage.removeItem('tambola_live_host_game');
+          alert("✅ Game Ended! Selected winners have been notified to enter their addresses.");
+      });
+  }
+
+  function createPlayerLink() {
+    let name = document.getElementById('p-name').value.trim();
+    let count = parseInt(document.getElementById('p-count').value);
+    
+    if(!name || !count) return alert("Please enter Player Name and Tickets Count");
+    
+    let pId = name.replace(/[^a-zA-Z0-9]/g, '_') + "_" + Date.now(); 
+    let currentUrl = window.location.href.split('?')[0].split('#')[0].replace(/\/index\.html$/, '').replace(/\/$/, '');
+    let link = `${currentUrl}/play.html?t=${btoa(encodeURIComponent(gameId+"|"+pId))}`;
+    
+    document.getElementById('link-output').innerHTML = `
+      <div class="data-card" style="border-left: 4px solid #4caf50;">
+          <b style="color:#2e7d32;">✅ Link Generated for ${name}:</b><br><br>
+          <a href="${link}" target="_blank" style="word-break:break-all; font-size:14px;">${link}</a><br><br>
+          <button class="btn blue" onclick="navigator.clipboard.writeText('${link}'); alert('Link Copied Successfully!');">COPY LINK</button>
+      </div>`;
+    document.getElementById('p-name').value = '';
+
+    setTimeout(() => {
+        db.ref('games/' + gameId + '/globalTicketCount').once('value', snap => {
+          let gCount = snap.val() || 0; let tickets = [];
+          for(let i=0; i<count; i++) { gCount++; tickets.push({ tNum: gCount, grid: generateUniqueTicketArray() }); }
+          db.ref('games/' + gameId).update({ globalTicketCount: gCount });
+          db.ref(`games/${gameId}/tickets/${pId}`).set({ name: name, data: tickets });
+        });
+    }, 10);
+  }
+
+  function addExtraTicket(pId, playerName) {
+    db.ref('games/' + gameId + '/globalTicketCount').once('value', snap => {
+      let currentGlobalCount = snap.val() || 0;
+      currentGlobalCount++;
+      db.ref('games/' + gameId).update({ globalTicketCount: currentGlobalCount });
+      
+      db.ref(`games/${gameId}/tickets/${pId}/data`).once('value', tSnap => {
+        let existing = tSnap.val() || [];
+        existing.push({ tNum: currentGlobalCount, grid: generateUniqueTicketArray() });
+        db.ref(`games/${gameId}/tickets/${pId}/data`).set(existing);
+      });
+    });
+  }
+
+  function cancelSpecificTicket(pId, ticketIndex) {
+    if(confirm("Are you sure you want to DELETE this specific ticket?")) {
+      db.ref(`games/${gameId}/tickets/${pId}/data`).once('value', snapshot => {
+        let pData = snapshot.val();
+        if (pData) {
+          pData.splice(ticketIndex, 1); 
+          if (pData.length === 0) db.ref(`games/${gameId}/tickets/${pId}`).remove(); 
+          else db.ref(`games/${gameId}/tickets/${pId}/data`).set(pData); 
+        }
+      });
+    }
+  }
+
+  function renderTickets(ticketsArray, name, pId) {
+    let container = document.getElementById('host-tickets-area');
+    ticketsArray.forEach((tObj, index) => {
+      let wrap = document.createElement('div'); wrap.className = 'ticket-wrap';
+      if(tObj.cancelled) wrap.innerHTML += `<div class="cancelled-overlay">CANCELLED</div>`;
+      
+      let headHTML = `
+        <span><b>${name}</b> (T.No ${tObj.tNum})</span>
+        <div class="action-btns">
+          <button class="t-btn btn-add" onclick="addExtraTicket('${pId}', '${name}')">+1 Ticket</button>
+          <button class="t-btn btn-del" onclick="cancelSpecificTicket('${pId}', ${index})">❌ DEL</button>
+        </div>`;
+        
+      let head = document.createElement('div'); head.className = 't-head'; head.innerHTML = headHTML;
+      let grid = document.createElement('div'); grid.className = 't-grid';
+      
+      for(let r=0; r<3; r++) {
+        for(let c=0; c<9; c++) {
+          let cell = document.createElement('div');
+          if(tObj.grid[r][c] === 0) { cell.className = 't-cell empty'; } 
+          else { 
+            cell.className = 't-cell num'; 
+            cell.innerText = tObj.grid[r][c]; 
+            if(calledNumbers.includes(tObj.grid[r][c])) cell.classList.add('marked');
+          }
+          grid.appendChild(cell);
+        }
+      }
+      wrap.appendChild(head); wrap.appendChild(grid); container.appendChild(wrap);
+    });
+  }
+
+  function fetchHistory() {
+    db.ref('games').once('value', snap => {
+      let html = '';
+      snap.forEach(child => {
+        let d = child.val();
+        let dt = new Date(d.createdAt).toLocaleString();
+        html += `<div class="data-card">
+            <h4 style="margin:0;">${child.key}</h4>
+            <p style="margin:4px 0;">Status: <b>${d.status}</b></p>
+            <p style="margin:4px 0;">Created: ${dt}</p>
+        </div>`;
+      });
+      document.getElementById('history-list').innerHTML = html;
+    });
+  }
+
+  function announceVoice(text) {
+    if ('speechSynthesis' in window && !isMicOn) {
+      window.speechSynthesis.cancel();
+      let msg = new SpeechSynthesisUtterance("Number " + text); msg.rate = 0.9;
+      window.speechSynthesis.speak(msg);
+    }
+  }
+
+  function generateUniqueTicketArray() {
+    let ticket = Array.from({ length: 3 }, () => Array(9).fill(0));
+    let colRanges = [[1,9],[10,19],[20,29],[30,39],[40,49],[50,59],[60,69],[70,79],[80,90]];
+    let colCounts = Array(9).fill(0);
+    for (let r = 0; r < 3; r++) {
+      let availableCols = [0,1,2,3,4,5,6,7,8].filter(i => colCounts[i] < (r === 2 ? 3 : 2)).sort(()=>Math.random()-0.5).slice(0,5);
+      availableCols.sort((a,b)=>a-b).forEach(c => {
+        colCounts[c]++; let num;
+        do { num = Math.floor(Math.random() * (colRanges[c][1] - colRanges[c][0] + 1)) + colRanges[c][0]; } 
+        while (ticket[0][c] === num || ticket[1][c] === num || ticket[2][c] === num); 
+        ticket[r][c] = num;
+      });
+    }
+    for (let c = 0; c < 9; c++) {
+      let colNums = [];
+      for (let r = 0; r < 3; r++) if (ticket[r][c] !== 0) colNums.push(ticket[r][c]);
+      if(colNums.length > 1) { colNums.sort((a,b) => a-b); let vIdx = 0; for (let r = 0; r < 3; r++) if (ticket[r][c] !== 0) ticket[r][c] = colNums[vIdx++]; }
+    }
+    return ticket;
+  }
+</script>
+</body>
+</html>
