@@ -13,7 +13,7 @@
   .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; animation: fadeIn 0.3s; }
   .input-box { width: 100%; padding: 12px; font-size: 16px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
   .btn { width: 100%; padding: 14px; font-size: 16px; color: white; background: #4caf50; border: none; border-radius: 8px; cursor: pointer; margin: 5px 0; font-weight: bold; text-transform: uppercase; }
-  .btn.blue { background: #1976d2; } .btn.red { background: #d32f2f; } .btn.dark { background: #37474f; }
+  .btn.blue { background: #1976d2; } .btn.red { background: #d32f2f; } .btn.dark { background: #37474f; } .btn.orange { background: #f57c00; }
   
   .bottom-nav { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; }
   .nav-item { flex: 1; text-align: center; font-size: 12px; color: #555; font-weight: bold; cursor: pointer; }
@@ -32,15 +32,23 @@
   .data-card { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 15px; margin-bottom: 10px; border-radius: 4px; text-align: left; word-break: break-all;}
   
   /* Tickets styling */
-  .ticket-wrap { border: 3px solid #6a1b9a; margin: 15px 0; background: white; border-radius: 8px; overflow: hidden;}
-  .t-head { background: #f3e5f5; color: #4a148c; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-  .t-grid { display: grid; grid-template-columns: repeat(9, 1fr); border-top: 2px solid #6a1b9a; }
+  .ticket-wrap { border: 2px solid #1565c0; margin: 15px 0; background: white; border-radius: 8px; overflow: hidden; position: relative;}
+  .t-head { background: #e3f2fd; color: #0d47a1; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; font-size: 14px;}
+  .t-grid { display: grid; grid-template-columns: repeat(9, 1fr); border-top: 2px solid #1565c0; }
   .t-cell { border: 1px solid #ccc; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; user-select: none; }
   .t-cell.empty { background: #fafafa; border-color: transparent; }
+  .t-cell.marked { background: #4caf50 !important; color: white; border-radius:50%; transform: scale(0.85); }
+  
+  /* Ticket Buttons */
+  .action-btns { display: flex; gap: 5px; }
+  .t-btn { border: none; padding: 5px 8px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; color: white;}
+  .btn-add { background: #1976d2; } .btn-del { background: #d32f2f; }
+  
+  .cancelled-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; color: red; font-size: 24px; font-weight: bold; transform: rotate(-10deg); pointer-events: none; z-index: 10;}
   
   @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  #toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
-  .toast { background: #37474f; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; border-left: 5px solid #4caf50; }
+  #toast-container { position: fixed; top: 20px; right: 20px; left: 20px; z-index: 1000; }
+  .toast { background: #37474f; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; border-left: 5px solid #4caf50; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
 </style>
 </head>
 <body>
@@ -73,10 +81,10 @@
       <label>Scheduled Start Time (Optional)</label>
       <input type="datetime-local" id="start-time" class="input-box">
       
-      <label>Gift Image (Optional - Use small sizes)</label>
+      <label>Gift Image (Optional - Max 1MB)</label>
       <input type="file" id="gift-image" class="input-box" accept="image/*" onchange="encodeImage(this)">
       <input type="hidden" id="gift-base64">
-      <p id="image-status" style="color:green; font-size:12px; display:none;">Image Loaded!</p>
+      <p id="image-status" style="color:green; font-size:12px; display:none;">Image Loaded Successfully!</p>
       
       <button class="btn blue" style="margin-top:20px;" onclick="initHostGame()">START NEW GAME</button>
     </div>
@@ -86,6 +94,9 @@
   <div id="tab-live" class="container tab-content">
     <div class="panel" style="text-align:center;">
       <h3 style="margin-top:0; color:#1565c0;" id="live-game-title">No Active Game</h3>
+      
+      <!-- FORCE START BUTTON (Shows only if timer is active) -->
+      <button id="force-start-btn" class="btn orange" style="display:none; margin-bottom:15px; animation: fadeIn 0.5s;" onclick="forceStartGame()">🚀 FORCE START NOW</button>
       
       <div style="background:#e8f5e9; padding:10px; border-radius:8px; border:2px dashed #4caf50; margin-bottom:15px;">
         <button id="mic-btn" class="btn dark" onclick="toggleMic()">🎤 MIC: OFF</button>
@@ -171,6 +182,7 @@
   let isMicOn = false, mediaRecorder;
   const SECRET_HOST_PIN = "7777"; 
 
+  // INIT
   window.onload = () => {
     let savedHostGame = localStorage.getItem('tambola_live_host_game');
     if(savedHostGame) {
@@ -179,6 +191,10 @@
       document.getElementById('app-view').style.display = 'block';
       switchTab('tab-live', document.querySelectorAll('.nav-item')[1]);
       createBoardUI('host-board');
+      
+      // Auto unlock speech synthesis if possible
+      if ('speechSynthesis' in window) { let msg = new SpeechSynthesisUtterance(""); window.speechSynthesis.speak(msg); }
+      
       listenToGameState();
       fetchHistory();
     }
@@ -189,7 +205,7 @@
       document.getElementById('login-view').classList.remove('active');
       document.getElementById('app-view').style.display = 'block';
       fetchHistory();
-    } else { alert("Wrong PIN!"); }
+    } else { alert("Wrong PIN!"); document.getElementById('host-pin').value = ''; }
   }
 
   function switchTab(tabId, el) {
@@ -199,12 +215,20 @@
     el.classList.add('active');
   }
 
+  function showToast(message) {
+    let container = document.getElementById('toast-container');
+    let toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
   function encodeImage(element) {
     let file = element.files[0];
-    if(file.size > 1048576) { // 1MB limit warning
+    if(file.size > 1048576) { 
       alert("Image is too large! Please choose an image smaller than 1MB.");
-      element.value = '';
-      return;
+      element.value = ''; return;
     }
     let reader = new FileReader();
     reader.onloadend = () => { 
@@ -219,11 +243,7 @@
     if(!gameId) return alert("Please enter Game ID");
     
     let timeInput = document.getElementById('start-time').value;
-    let sTime = 0;
-    if (timeInput) {
-       sTime = new Date(timeInput).getTime();
-    }
-    
+    let sTime = timeInput ? new Date(timeInput).getTime() : 0;
     let gImage = document.getElementById('gift-base64').value || "";
     
     allNumbers = [];
@@ -249,14 +269,30 @@
     alert("Game Started Successfully!");
   }
 
+  // FORCE START LOGIC
+  function forceStartGame() {
+    if(confirm("Force start the game immediately? This will remove the countdown for players.")) {
+      db.ref('games/' + gameId).update({ startTime: Date.now() });
+      document.getElementById('force-start-btn').style.display = 'none';
+    }
+  }
+
   function listenToGameState() {
     document.getElementById('live-game-title').innerText = "Playing: " + gameId;
     
+    // Listen to Game Data
     db.ref('games/' + gameId).on('value', snapshot => {
       let data = snapshot.val();
       if(!data) return;
       if(data.status === 'ended') localStorage.removeItem('tambola_live_host_game');
       
+      // Force Start Button Display Logic
+      if(data.startTime && data.startTime > Date.now()) {
+        document.getElementById('force-start-btn').style.display = 'block';
+      } else {
+        document.getElementById('force-start-btn').style.display = 'none';
+      }
+
       let newNum = data.currentDraw;
       calledNumbers = data.called || [];
       if(newNum > 0) {
@@ -265,7 +301,7 @@
       }
     });
 
-    // TICKETS VIEWER FIX: Listen specifically to tickets array to update UI
+    // TICKETS REFRESH FIX
     db.ref(`games/${gameId}/tickets`).on('value', snapshot => {
       let container = document.getElementById('host-tickets-area');
       container.innerHTML = '';
@@ -280,7 +316,7 @@
       if(!hasTickets) container.innerHTML = '<i>No tickets generated yet.</i>';
     });
 
-    // ADDRESS VIEWER
+    // WINNERS DATA
     db.ref(`games/${gameId}/winnersDetails`).on('value', snap => {
       let html = '';
       snap.forEach(child => {
@@ -293,6 +329,12 @@
         </div>`;
       });
       document.getElementById('winners-address-list').innerHTML = html || "No address details submitted yet.";
+    });
+
+    // WINNERS NOTIFICATION
+    db.ref(`games/${gameId}/winners`).on('child_added', snap => {
+      let winner = snap.val();
+      showToast(`🎉 <b>${winner.name} (Ticket ${winner.tNum})</b> Claimed Housie!`);
     });
   }
 
@@ -316,6 +358,11 @@
         else if(calledNumbers.includes(i)) hCell.classList.add('called');
       }
     }
+    // Update live tickets marks
+    document.querySelectorAll('#host-tickets-area .t-cell.num').forEach(cell => {
+      if(calledNumbers.includes(parseInt(cell.innerText))) cell.classList.add('marked');
+      else cell.classList.remove('marked');
+    });
   }
 
   function drawSingle() {
@@ -346,11 +393,14 @@
     }
   }
 
-  // MIC FIX: 1-second chunks, robust format handling
   function toggleMic() {
     if(!isMicOn) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-        mediaRecorder = new MediaRecorder(stream);
+        let options = {};
+        if(MediaRecorder.isTypeSupported('audio/webm')) { options = {mimeType: 'audio/webm'}; }
+        else if (MediaRecorder.isTypeSupported('audio/mp4')) { options = {mimeType: 'audio/mp4'}; }
+        
+        mediaRecorder = new MediaRecorder(stream, options);
         mediaRecorder.ondataavailable = e => {
           if(e.data.size > 0 && isMicOn) {
             let reader = new FileReader();
@@ -358,11 +408,11 @@
             reader.onloadend = () => db.ref(`games/${gameId}/audioStream`).set({ data: reader.result, ts: Date.now() });
           }
         };
-        mediaRecorder.start(1000); // 1-second chunks
+        mediaRecorder.start(1000); 
         isMicOn = true;
         document.getElementById('mic-btn').innerText = "🎤 MIC: ON (Live)";
         document.getElementById('mic-btn').className = "btn red";
-      }).catch(err => alert("Microphone access denied or not supported on this browser."));
+      }).catch(err => alert("Microphone access denied!"));
     } else {
       if(mediaRecorder) { 
         mediaRecorder.stop(); 
@@ -374,15 +424,15 @@
     }
   }
 
-  // GAME OVER CONFIRMATION FIX
+  // CONFIRMATION FIX FOR GAME OVER
   function endGame() {
-    let confirmMsg = "Are you SURE you want to end this game?\n\n- Players cannot play anymore.\n- Winners will be prompted to enter their Address details.";
+    let confirmMsg = "🛑 WARNING: GAME OVER 🛑\n\nAre you SURE you want to end this game?\n- Players cannot play anymore.\n- Winners will be prompted to enter their Delivery Addresses.";
     if(confirm(confirmMsg)) {
       db.ref('games/' + gameId).update({ status: 'ended' });
       clearInterval(autoPlayTimer); 
       if(isMicOn) toggleMic();
       localStorage.removeItem('tambola_live_host_game'); 
-      alert("Game Ended successfully! Check 'Gifts' tab for player addresses.");
+      alert("Game Ended! Winners are filling out forms now. Check the 'Gifts' tab.");
     }
   }
 
@@ -414,14 +464,51 @@
     });
   }
 
-  // TICKET RENDERING FIX
+  function addExtraTicket(pId, playerName) {
+    db.ref('games/' + gameId + '/globalTicketCount').once('value').then(snap => {
+      let currentGlobalCount = snap.val() || 0;
+      currentGlobalCount++;
+      db.ref('games/' + gameId).update({ globalTicketCount: currentGlobalCount });
+      
+      db.ref(`games/${gameId}/tickets/${pId}/data`).once('value').then(tSnap => {
+        let existing = tSnap.val() || [];
+        existing.push({ tNum: currentGlobalCount, grid: generateUniqueTicketArray() });
+        db.ref(`games/${gameId}/tickets/${pId}/data`).set(existing);
+      });
+    });
+  }
+
+  // TICKET DELETE FIX
+  function cancelSpecificTicket(pId, ticketIndex) {
+    if(confirm("Are you sure you want to DELETE this specific ticket?")) {
+      db.ref(`games/${gameId}/tickets/${pId}/data`).once('value', snapshot => {
+        let pData = snapshot.val();
+        if (pData) {
+          pData.splice(ticketIndex, 1); 
+          if (pData.length === 0) db.ref(`games/${gameId}/tickets/${pId}`).remove(); 
+          else db.ref(`games/${gameId}/tickets/${pId}/data`).set(pData); 
+        }
+      });
+    }
+  }
+
   function renderTickets(ticketsArray, name, pId) {
     let container = document.getElementById('host-tickets-area');
-    ticketsArray.forEach((tObj) => {
+    ticketsArray.forEach((tObj, index) => {
       let wrap = document.createElement('div'); wrap.className = 'ticket-wrap';
-      let headHTML = `<span>${name} - Ticket ${tObj.tNum}</span>`;
+      if(tObj.cancelled) wrap.innerHTML += `<div class="cancelled-overlay">CANCELLED</div>`;
+      
+      // CLEARLY VISIBLE DELETE BUTTON
+      let headHTML = `
+        <span><b>${name}</b> (T.No ${tObj.tNum})</span>
+        <div class="action-btns">
+          <button class="t-btn btn-add" onclick="addExtraTicket('${pId}', '${name}')">+1 Ticket</button>
+          <button class="t-btn btn-del" onclick="cancelSpecificTicket('${pId}', ${index})">❌ DEL</button>
+        </div>`;
+        
       let head = document.createElement('div'); head.className = 't-head'; head.innerHTML = headHTML;
       let grid = document.createElement('div'); grid.className = 't-grid';
+      
       for(let r=0; r<3; r++) {
         for(let c=0; c<9; c++) {
           let cell = document.createElement('div');
